@@ -177,3 +177,121 @@ pub fn bit_vector_to_string(bits: &Vec<Bit>) -> String {
     str
 }
 
+#[cfg(test)]
+mod tests {
+    use crate::hamming_encoding::*;
+
+    // Tests for Bin vector
+
+    #[test]
+    fn from_bytes_test() {
+        let byte_data = vec![1; 4];
+        let vector = bit_vector_from_bytes(&byte_data);
+        assert_eq!(vector.len(), 4 * 8);
+        for i in 0..vector.len() {
+            if (i + 1) % 8 == 0 {
+                assert_eq!(vector[i], true)
+            } else {
+                assert_eq!(vector[i], false)
+            }
+        }
+    }
+
+    #[test]
+    fn to_bytes_test() {
+        let byte_data = vec![1; 10];
+        let vector = bit_vector_from_bytes(&byte_data);
+        let new_bytes = bit_vector_to_bytes(&vector);
+        assert_eq!(byte_data, new_bytes);
+    }
+
+    #[test]
+    fn to_string_test() {
+        let byte_data = vec![0b00001110];
+        let vector = bit_vector_from_bytes(&byte_data);
+        let str = bit_vector_to_string(&vector);
+        assert_eq!(str, "00001110")
+    }
+
+    // Tests for Hamming Code
+    #[test]
+    fn encode_test() {
+        let bytes = vec![0b11110000]; // Result: [1(whole block parity bit) + 1111_1110_0000] = 24 bits
+        let vector = bit_vector_from_bytes(&bytes);
+        let encoded_bits = encode(&vector);
+        let str_result = bit_vector_to_string(&encoded_bits);
+        assert_eq!(encoded_bits.len(), 13);
+        assert_eq!(str_result, "1111111100000");
+    }
+
+    #[test]
+    fn decode_no_errors_test() {
+        let bytes = vec![0b11110000];
+        let vector = bit_vector_from_bytes(&bytes);
+        let mut encoded_bits = encode(&vector);
+        let decoded_bits = match decode(&mut encoded_bits) {
+            HammingDecodeResult::NoError { decoded_bits } => decoded_bits,
+            _ => unreachable!(),
+        };
+        let str_result = bit_vector_to_string(&decoded_bits);
+        assert_eq!(decoded_bits.len(), 8);
+        assert_eq!(str_result, "11110000");
+    }
+
+    #[test]
+    fn decode_one_error_test1() {
+        let bytes = vec![0b11110000];
+        let vector = bit_vector_from_bytes(&bytes);
+        let mut encoded_bits = encode(&vector);
+        let error_position = 3;
+        encoded_bits[error_position] = !encoded_bits[error_position];
+        let decoded_bits = match decode(&mut encoded_bits) {
+            HammingDecodeResult::OneError {
+                position,
+                decoded_bits,
+            } => {
+                assert_eq!(position, error_position);
+                decoded_bits
+            }
+            _ => unreachable!(),
+        };
+        let str_result = bit_vector_to_string(&decoded_bits);
+        assert_eq!(decoded_bits.len(), 8);
+        assert_eq!(str_result, "11110000");
+    }
+
+    #[test]
+    fn decode_one_error_test2() {
+        let bytes = vec![0b11110000];
+        let vector = bit_vector_from_bytes(&bytes);
+        let mut encoded_bits = encode(&vector);
+        let error_position = 0;
+        encoded_bits[error_position] = !encoded_bits[error_position];
+        let decoded_bits = match decode(&mut encoded_bits) {
+            HammingDecodeResult::OneError {
+                position,
+                decoded_bits,
+            } => {
+                assert_eq!(position, error_position);
+                decoded_bits
+            }
+            _ => unreachable!(),
+        };
+        let str_result = bit_vector_to_string(&decoded_bits);
+        assert_eq!(decoded_bits.len(), 8);
+        assert_eq!(str_result, "11110000");
+    }
+
+    #[test]
+    fn decode_two_error_test() {
+        let bytes = vec![0b11110000];
+        let vector = bit_vector_from_bytes(&bytes);
+        let mut encoded_bits = encode(&vector);
+        encoded_bits[0] = !encoded_bits[0];
+        encoded_bits[1] = !encoded_bits[1];
+        match decode(&mut encoded_bits) {
+            HammingDecodeResult::DoubleError => assert!(true),
+            _ => assert!(false),
+        };
+    }
+}
