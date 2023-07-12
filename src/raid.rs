@@ -181,3 +181,71 @@ impl RaidII {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use crate::raid::*;
+
+    #[test]
+    fn raid_create_test() {
+        let bytes_per_disk = 1024;
+        let raid_ii = RaidII::from_data_capacity(bytes_per_disk);
+        assert_eq!(raid_ii.disk_size, bytes_per_disk);
+        assert_eq!(raid_ii.files.len(), 0);
+        assert_eq!(raid_ii.data_bit_disks.len(), 8);
+        assert_eq!(raid_ii.hamming_bit_disks.len(), 4);
+        assert_eq!(raid_ii.total_disks, 13);
+        assert_eq!(raid_ii.free_space, raid_ii.disk_size * raid_ii.total_disks);
+        assert_eq!(
+            raid_ii.total_capcity,
+            raid_ii.disk_size * raid_ii.total_disks
+        );
+        assert_eq!(raid_ii.files.len(), 0);
+    }
+
+    #[test]
+    fn raid_use_test1() {
+        let bytes_per_disk = 1024;
+        let mut raid_ii = RaidII::from_data_capacity(bytes_per_disk);
+        let text_data = "Hello, Rust!";
+        let bytes = text_data.as_bytes().to_vec();
+        let file_name = "Greeting".to_owned();
+        let file_type = FileType::Text;
+
+        match raid_ii.write_file(&bytes, &file_type, &file_name) {
+            FileWriteResult::Success => match raid_ii.read_file(&file_name) {
+                FileReadResult::NotFound => assert!(false),
+                FileReadResult::DisksCorrupted => assert!(false),
+                FileReadResult::Success(find_file_type, find_bytes) => match find_file_type {
+                    FileType::Text => assert_eq!(bytes, find_bytes),
+                },
+            },
+            FileWriteResult::NotEnoughSpace => assert!(false),
+        }
+    }
+
+    #[test]
+    fn raid_use_test2() {
+        let bytes_per_disk = 1024;
+        let mut raid_ii = RaidII::from_data_capacity(bytes_per_disk);
+        let text_data = "Rust is ideal for many people for a variety of reasons. 
+        Rust is for people who crave speed and stability in a language. 
+        By speed, we mean both how quickly Rust code can run and the speed at which Rust lets you write programs. 
+        The Rust compiler’s checks ensure stability through feature additions and refactoring.";
+
+        let bytes = text_data.as_bytes().to_vec();
+        let file_name = "Introduction to Rust".to_owned();
+        let file_type = FileType::Text;
+
+        match raid_ii.write_file(&bytes, &file_type, &file_name) {
+            FileWriteResult::Success => match raid_ii.read_file(&file_name) {
+                FileReadResult::NotFound => assert!(false),
+                FileReadResult::DisksCorrupted => assert!(false),
+                FileReadResult::Success(find_file_type, find_bytes) => match find_file_type {
+                    FileType::Text => assert_eq!(bytes, find_bytes),
+                },
+            },
+            FileWriteResult::NotEnoughSpace => assert!(false),
+        }
+    }
+}
