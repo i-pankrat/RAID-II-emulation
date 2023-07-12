@@ -21,7 +21,6 @@ fn main() {
                 match tokens.first() {
                     Some(string) => match *string {
                         "write" => {
-                            println!("write");
                             if tokens.len() != 3 {
                                 say_error();
                                 continue;
@@ -42,7 +41,6 @@ fn main() {
                             }
                         }
                         "read" => {
-                            println!("read");
                             if tokens.len() != 2 {
                                 say_error();
                                 continue;
@@ -76,7 +74,6 @@ fn main() {
                             }
                         }
                         "corrupt" => {
-                            println!("corrupt");
                             if tokens.len() != 2 {
                                 say_error();
                                 continue;
@@ -98,7 +95,6 @@ fn main() {
                             }
                         }
                         "exit" => {
-                            println!("exit");
                             break;
                         }
                         _ => {
