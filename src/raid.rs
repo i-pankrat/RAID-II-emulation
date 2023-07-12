@@ -40,8 +40,13 @@ pub enum FileReadResult {
 }
 
 enum ReadData<T> {
-    Some(T),
-    CorruptedData,
+    ValidData(T),
+    CorruptedData {
+        data: T,
+        disk_number: usize,
+        bit_number: usize,
+    },
+    InvalidData,
 }
 
 impl RaidII {
@@ -129,21 +134,40 @@ impl RaidII {
     }
 
     pub fn read_file(&mut self, name: &String) -> FileReadResult {
-        let mut corrupted_data = false;
+        let mut invalid_data = false;
         match self.files.iter().find(|x| (*x).name == *name) {
             Some(file) => {
                 let mut bytes = Vec::with_capacity(file.size);
                 for position in file.start_pos..file.end_pos {
                     match self.read_byte(position) {
-                        ReadData::Some(byte) => bytes.push(byte),
-                        ReadData::CorruptedData => {
-                            corrupted_data = true;
+                        ReadData::ValidData(byte) => bytes.push(byte),
+                        ReadData::CorruptedData {
+                            data,
+                            bit_number,
+                            disk_number,
+                        } => {
+                            // Restore invalid bit
+                            if disk_number == 0 {
+                                self.parity_bit_disk[bit_number] =
+                                    !self.parity_bit_disk[bit_number];
+                            } else if 0 < disk_number && disk_number <= 8 {
+                                self.data_bit_disks[disk_number - 1][bit_number] =
+                                    !self.data_bit_disks[disk_number - 1][bit_number];
+                            } else {
+                                let offset = 1 + self.data_bit_disks.len();
+                                self.hamming_bit_disks[disk_number - offset][bit_number] =
+                                    !self.hamming_bit_disks[disk_number - offset][bit_number];
+                            }
+                            bytes.push(data)
+                        }
+                        ReadData::InvalidData => {
+                            invalid_data = true;
                             break;
                         }
                     }
                 }
 
-                if corrupted_data {
+                if invalid_data {
                     FileReadResult::DisksCorrupted
                 } else {
                     FileReadResult::Success(file.file_type, bytes)
@@ -166,18 +190,30 @@ impl RaidII {
         }
 
         match decode(&mut bits) {
-            HammingDecodeResult::NoError { decoded_bits } => Self::analyze_bits(&decoded_bits),
-            HammingDecodeResult::OneError { decoded_bits, .. } => Self::analyze_bits(&decoded_bits),
-            HammingDecodeResult::DoubleError => ReadData::CorruptedData,
-        }
-    }
-
-    fn analyze_bits(data: &Vec<Bit>) -> ReadData<u8> {
-        let bytes = bit_vector_to_bytes(&data);
-        if bytes.len() == 1 {
-            ReadData::Some(bytes[0])
-        } else {
-            ReadData::CorruptedData
+            HammingDecodeResult::NoError { decoded_bits } => {
+                let bytes = bit_vector_to_bytes(&decoded_bits);
+                if bytes.len() == 1 {
+                    ReadData::ValidData(bytes[0])
+                } else {
+                    ReadData::InvalidData
+                }
+            }
+            HammingDecodeResult::OneError {
+                decoded_bits,
+                position: invalid_bit,
+            } => {
+                let bytes = bit_vector_to_bytes(&decoded_bits);
+                if bytes.len() == 1 {
+                    ReadData::CorruptedData {
+                        data: bytes[0],
+                        disk_number: invalid_bit,
+                        bit_number: position,
+                    }
+                } else {
+                    ReadData::InvalidData
+                }
+            }
+            HammingDecodeResult::DoubleError => ReadData::InvalidData,
         }
     }
 
@@ -200,7 +236,7 @@ impl RaidII {
         }
     }
 
-    pub fn inner_corrupt_disk(disk: &mut Disk) {
+    fn inner_corrupt_disk(disk: &mut Disk) {
         for i in 0..disk.len() {
             disk[i] = !disk[i];
         }
