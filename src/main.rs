@@ -2,27 +2,28 @@ pub mod hamming_encoding;
 pub mod raid;
 
 use raid::{FileType, RaidII};
-use std::io;
+use std::io::{self, Write};
 
 fn main() {
     help();
-    invite_to_enter_command();
     let mut raid = RaidII::from_data_capacity(1024);
+    let mut user_input = String::new();
+    let mut stdout = io::stdout();
+    let stdin = io::stdin();
 
     loop {
-        let mut user_input = String::new();
-        let stdin = io::stdin();
-
+        user_input.clear();
+        invite_to_enter_command();
+        let _ = stdout.flush();
         match stdin.read_line(&mut user_input) {
             Ok(_) => {
                 let tokens: Vec<&str> = user_input.split_whitespace().collect();
-
                 match tokens.first() {
                     Some(string) => match *string {
                         "write" => {
+                            println!("write");
                             if tokens.len() != 3 {
                                 say_error();
-                                invite_to_enter_command();
                                 continue;
                             }
 
@@ -41,9 +42,9 @@ fn main() {
                             }
                         }
                         "read" => {
+                            println!("read");
                             if tokens.len() != 2 {
                                 say_error();
-                                invite_to_enter_command();
                                 continue;
                             }
 
@@ -51,7 +52,9 @@ fn main() {
                             let result = raid.read_file(&name);
 
                             match result {
-                                raid::FileReadResult::NotFound => println!("File {} does not exist", name),
+                                raid::FileReadResult::NotFound => {
+                                    println!("File {} does not exist", name)
+                                }
                                 raid::FileReadResult::DisksCorrupted => println!(
                                     "All data is corrupted. Failed to complete you request!"
                                 ),
@@ -72,18 +75,39 @@ fn main() {
                                 }
                             }
                         }
+                        "corrupt" => {
+                            println!("corrupt");
+                            if tokens.len() != 2 {
+                                say_error();
+                                continue;
+                            }
+
+                            match tokens[1].parse::<usize>() {
+                                Ok(disk_number) => {
+                                    if 0 < disk_number && disk_number <= 13 {
+                                        raid.corrupt_disk(disk_number);
+                                    } else {
+                                        say_error();
+                                        continue;
+                                    }
+                                }
+                                Err(_) => {
+                                    say_error();
+                                    continue;
+                                }
+                            }
+                        }
                         "exit" => {
+                            println!("exit");
                             break;
                         }
                         _ => {
                             say_error();
-                            invite_to_enter_command();
                             continue;
                         }
                     },
                     None => {
-                        say_error();
-                        invite_to_enter_command();
+                        println!("Can not read the command.");
                         continue;
                     }
                 }
@@ -98,6 +122,7 @@ fn help() {
         "This is a simulation of RAID II operation. Available commands:
         - write str_data file_name
         - read file_name
+        - corrupt disk_number(from 1 to 13)
         - exit"
     );
 }
@@ -107,5 +132,5 @@ fn invite_to_enter_command() {
 }
 
 fn say_error() {
-    print!("Invalid command. Try again, please!");
+    println!("Invalid command. Try again, please!");
 }

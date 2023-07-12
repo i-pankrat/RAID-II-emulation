@@ -144,7 +144,7 @@ impl RaidII {
                 }
 
                 if corrupted_data {
-                    FileReadResult::NotFound
+                    FileReadResult::DisksCorrupted
                 } else {
                     FileReadResult::Success(file.file_type, bytes)
                 }
@@ -178,6 +178,31 @@ impl RaidII {
             ReadData::Some(bytes[0])
         } else {
             ReadData::CorruptedData
+        }
+    }
+
+    pub fn corrupt_disk(&mut self, disk_number: usize) -> bool {
+        let end_data_disk_range = self.data_bit_disks.len() + 1;
+        let end_hamming_disk_range = self.total_disks;
+        if disk_number == 1 {
+            Self::inner_corrupt_disk(&mut self.parity_bit_disk);
+            true
+        } else if 1 < disk_number && disk_number <= end_data_disk_range {
+            Self::inner_corrupt_disk(&mut self.data_bit_disks[disk_number - 1]);
+            true
+        } else if end_data_disk_range < disk_number && disk_number <= end_hamming_disk_range {
+            Self::inner_corrupt_disk(
+                &mut self.hamming_bit_disks[disk_number - end_data_disk_range],
+            );
+            true
+        } else {
+            false
+        }
+    }
+
+    pub fn inner_corrupt_disk(disk: &mut Disk) {
+        for i in 0..disk.len() {
+            disk[i] = !disk[i];
         }
     }
 }
@@ -246,6 +271,26 @@ mod tests {
                 },
             },
             FileWriteResult::NotEnoughSpace => assert!(false),
+        }
+    }
+
+    #[test]
+    fn corrupt_disk_test1() {
+        let bytes_per_disk = 1024;
+        let mut raid_ii = RaidII::from_data_capacity(bytes_per_disk);
+        let text_data = "Hello, Rust!";
+        let bytes = text_data.as_bytes().to_vec();
+        let file_name = "Greeting".to_owned();
+        let file_type = FileType::Text;
+        raid_ii.write_file(&bytes, &file_type, &file_name);
+        assert_eq!(raid_ii.files.len(), 1);
+        raid_ii.corrupt_disk(1);
+        raid_ii.corrupt_disk(2);
+
+        match raid_ii.read_file(&file_name) {
+            FileReadResult::NotFound => assert!(false),
+            FileReadResult::DisksCorrupted => assert!(true),
+            FileReadResult::Success(..) => assert!(false),
         }
     }
 }
