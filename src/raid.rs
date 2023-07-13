@@ -86,7 +86,7 @@ impl RaidII {
     pub fn write_file(
         &mut self,
         data: &Vec<u8>,
-        file_type: &FileType,
+        file_type: FileType,
         name: &String,
     ) -> FileWriteResult {
         match file_type {
@@ -101,7 +101,7 @@ impl RaidII {
                         start_pos: self.total_capcity - self.free_space,
                         end_pos: self.total_capcity - self.free_space + data.len(),
                         size: data.len(),
-                        file_type: *file_type,
+                        file_type,
                     };
 
                     self.free_space -= data.len();
@@ -122,13 +122,13 @@ impl RaidII {
         self.parity_bit_disk.push(encoded_bits[written_bit_counter]);
         written_bit_counter += 1;
 
-        for i in 0..self.data_bit_disks.len() {
-            self.data_bit_disks[i].push(encoded_bits[written_bit_counter]);
+        for disk in &mut self.data_bit_disks {
+            disk.push(encoded_bits[written_bit_counter]);
             written_bit_counter += 1;
         }
 
-        for i in 0..self.hamming_bit_disks.len() {
-            self.hamming_bit_disks[i].push(encoded_bits[written_bit_counter]);
+        for disk in &mut self.hamming_bit_disks {
+            disk.push(encoded_bits[written_bit_counter]);
             written_bit_counter += 1;
         }
     }
@@ -147,16 +147,20 @@ impl RaidII {
                             disk_number,
                         } => {
                             // Restore invalid bit
-                            if disk_number == 0 {
-                                self.parity_bit_disk[bit_number] =
-                                    !self.parity_bit_disk[bit_number];
-                            } else if 0 < disk_number && disk_number <= 8 {
-                                self.data_bit_disks[disk_number - 1][bit_number] =
-                                    !self.data_bit_disks[disk_number - 1][bit_number];
-                            } else {
-                                let offset = 1 + self.data_bit_disks.len();
-                                self.hamming_bit_disks[disk_number - offset][bit_number] =
-                                    !self.hamming_bit_disks[disk_number - offset][bit_number];
+                            match disk_number {
+                                0 => {
+                                    self.parity_bit_disk[bit_number] =
+                                        !self.parity_bit_disk[bit_number];
+                                }
+                                0..=8 => {
+                                    self.data_bit_disks[disk_number - 1][bit_number] =
+                                        !self.data_bit_disks[disk_number - 1][bit_number];
+                                }
+                                _ => {
+                                    let offset = 1 + self.data_bit_disks.len();
+                                    self.hamming_bit_disks[disk_number - offset][bit_number] =
+                                        !self.hamming_bit_disks[disk_number - offset][bit_number];
+                                }
                             }
                             bytes.push(data)
                         }
@@ -273,7 +277,7 @@ mod tests {
         let file_name = "Greeting".to_owned();
         let file_type = FileType::Text;
 
-        match raid_ii.write_file(&bytes, &file_type, &file_name) {
+        match raid_ii.write_file(&bytes, file_type, &file_name) {
             FileWriteResult::Success => match raid_ii.read_file(&file_name) {
                 FileReadResult::NotFound => assert!(false),
                 FileReadResult::DisksCorrupted => assert!(false),
@@ -298,7 +302,7 @@ mod tests {
         let file_name = "Introduction to Rust".to_owned();
         let file_type = FileType::Text;
 
-        match raid_ii.write_file(&bytes, &file_type, &file_name) {
+        match raid_ii.write_file(&bytes, file_type, &file_name) {
             FileWriteResult::Success => match raid_ii.read_file(&file_name) {
                 FileReadResult::NotFound => assert!(false),
                 FileReadResult::DisksCorrupted => assert!(false),
@@ -318,7 +322,7 @@ mod tests {
         let bytes = text_data.as_bytes().to_vec();
         let file_name = "Greeting".to_owned();
         let file_type = FileType::Text;
-        raid_ii.write_file(&bytes, &file_type, &file_name);
+        raid_ii.write_file(&bytes, file_type, &file_name);
         assert_eq!(raid_ii.files.len(), 1);
         raid_ii.corrupt_disk(1);
         raid_ii.corrupt_disk(2);

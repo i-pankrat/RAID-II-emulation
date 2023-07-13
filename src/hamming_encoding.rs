@@ -87,22 +87,21 @@ pub fn decode(bits: &mut Vec<Bit>) -> HammingDecodeResult {
 
     let decoded_bits = bits.len() - parity_bits_number;
 
-    if !block_parity && wrong_parity_bits.len() == 0 {
+    if !block_parity && wrong_parity_bits.is_empty() {
         let decoded_bits = get_inner_data(&bits, decoded_bits);
-        return HammingDecodeResult::NoError { decoded_bits };
+        HammingDecodeResult::NoError { decoded_bits }
     } else if block_parity {
         // One mistake
         let position = wrong_parity_bits.iter().sum();
-        let opposing = if bits[position] { false } else { true };
-        bits[position] = opposing;
+        bits[position] = !(bits[position] as Bit);
         let decoded_bits = get_inner_data(&bits, decoded_bits);
-        return HammingDecodeResult::OneError {
+        HammingDecodeResult::OneError {
             position,
             decoded_bits,
-        };
+        }
     } else {
         // Two mistakes
-        return HammingDecodeResult::DoubleError;
+        HammingDecodeResult::DoubleError
     }
 }
 
@@ -113,7 +112,6 @@ fn get_inner_data(encoded_bits: &Vec<Bit>, decoded_size: usize) -> Vec<Bit> {
     for i in 1..encoded_bits.len() {
         if 1 << power_counter == i {
             power_counter += 1;
-            continue;
         } else {
             inner_data.push(encoded_bits[i]);
         }
@@ -128,11 +126,7 @@ pub fn bit_vector_from_bytes(bytes: &Vec<u8>) -> Vec<Bit> {
         let mut tmp = *byte;
         let mut byte_vector = Vec::with_capacity(8);
         while tmp != 0 {
-            if tmp % 2 == 0 {
-                byte_vector.push(false);
-            } else {
-                byte_vector.push(true);
-            }
+            byte_vector.push(tmp % 2 != 0);
             tmp >>= 1;
         }
 

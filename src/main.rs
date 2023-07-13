@@ -28,7 +28,7 @@ fn main() {
 
                             let data = tokens[1].as_bytes().to_vec();
                             let name = tokens[2].to_owned();
-                            let result = raid.write_file(&data, &FileType::Text, &name);
+                            let result = raid.write_file(&data, FileType::Text, &name);
 
                             match result {
                                 raid::FileWriteResult::Success => println!(
