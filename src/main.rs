@@ -54,7 +54,7 @@ fn main() {
                                     println!("File {} does not exist", name)
                                 }
                                 raid::FileReadResult::DisksCorrupted => println!(
-                                    "All data is corrupted. Failed to complete you request!"
+                                    "All data is corrupted. Failed to complete you request! Two disks are corrupted so there is no way to restore data :("
                                 ),
                                 raid::FileReadResult::Success(file_type, byte_data) => {
                                     match file_type {
@@ -65,8 +65,8 @@ fn main() {
                                                     name, content_string
                                                 );
                                             }
-                                            Err(_) => unreachable!(
-                                                "All data stored at RAID has UTF8 format"
+                                            Err(_) => panic!(
+                                                "All data stored at RAID has UTF8 format. This can happen if more than 3 disks are damaged."
                                             ),
                                         },
                                     }
